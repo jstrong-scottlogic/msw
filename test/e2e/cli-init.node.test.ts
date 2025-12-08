@@ -473,3 +473,21 @@ test('copies the script only to provided unix path in args', async () => {
     ),
   ).toBe(false)
 })
+
+test('aliases "update-worker" to "init" command', async () => {
+  await fsMock.create({
+    'package.json': JSON.stringify({
+      name: 'test',
+      msw: {
+        workerDirectory: 'public',
+      },
+    }),
+  })
+
+  const result = await fsMock.exec(`node ${CLI_PATH} update-worker`)
+
+  expect(result.stderr).toBe('')
+  expect(fs.existsSync(fsMock.resolve('public/mockServiceWorker.js'))).toBe(
+    true,
+  )
+})

@@ -31,5 +31,18 @@ yargs(process.argv.slice(2))
     },
     init,
   )
+  .command(
+    'update-worker',
+    'Updates the Mock Service Worker script in all configured directories',
+    (yargs) => {
+      yargs.option('cwd', {
+        type: 'string',
+        description: 'Custom current worker directory',
+        normalize: true,
+      })
+        .example('msw update-worker')
+    },
+    init,
+  )
   .demandCommand()
   .help().argv
