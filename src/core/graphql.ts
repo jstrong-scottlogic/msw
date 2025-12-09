@@ -12,17 +12,15 @@ import {
   GraphQLResponseBody,
   GraphQLQuery,
   GraphQLCustomPredicate,
+  DocumentTypeDecoration,
 } from './handlers/GraphQLHandler'
 import type { Path } from './utils/matching/matchRequestUrl'
 
 export interface TypedDocumentNode<
   Result = { [key: string]: any },
   Variables = { [key: string]: any },
-> extends DocumentNode {
-  __apiType?: (variables: Variables) => Result
-  __resultType?: Result
-  __variablesType?: Variables
-}
+> extends DocumentNode,
+    DocumentTypeDecoration<Result, Variables> {}
 
 export type GraphQLRequestHandler = <
   Query extends GraphQLQuery = GraphQLQuery,
@@ -31,7 +29,7 @@ export type GraphQLRequestHandler = <
   predicate:
     | GraphQLHandlerNameSelector
     | DocumentNode
-    | TypedDocumentNode<Query, Variables>
+    | DocumentTypeDecoration<Query, Variables>
     | GraphQLCustomPredicate,
   resolver: GraphQLResponseResolver<
     [Query] extends [never] ? GraphQLQuery : Query,
