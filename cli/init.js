@@ -108,8 +108,6 @@ function toAbsolutePath(maybeAbsolutePath, cwd) {
  * @returns {Promise<string>}
  */
 async function copyWorkerScript(destination, cwd) {
-  // When running as a part of "postinstall" script, "cwd" equals the library's directory.
-  // The "postinstall" script resolves the right absolute public directory path.
   const absolutePublicDir = toAbsolutePath(destination, cwd)
 
   if (!fs.existsSync(absolutePublicDir)) {
