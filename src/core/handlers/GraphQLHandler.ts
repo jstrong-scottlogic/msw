@@ -1,4 +1,9 @@
-import type { DocumentNode, GraphQLError, OperationTypeNode } from 'graphql'
+import {
+  parse,
+  type DocumentNode,
+  type GraphQLError,
+  type OperationTypeNode,
+} from 'graphql'
 import {
   DefaultBodyType,
   RequestHandler,
@@ -21,8 +26,24 @@ import { toPublicUrl } from '../utils/request/toPublicUrl'
 import { devUtils } from '../utils/internal/devUtils'
 import { getAllRequestCookies } from '../utils/request/getRequestCookies'
 
+export interface DocumentTypeDecoration<
+  Result = { [key: string]: any },
+  Variables = { [key: string]: any },
+> {
+  /**
+   * Ensures the variables and result are valid for the query.
+   */
+  __apiType?: (variables: Variables) => Result
+  __resultType?: Result
+  __variablesType?: Variables
+}
+
 export type GraphQLOperationType = OperationTypeNode | 'all'
-export type GraphQLHandlerNameSelector = DocumentNode | RegExp | string
+export type GraphQLHandlerNameSelector =
+  | DocumentTypeDecoration<any, any>
+  | RegExp
+  | DocumentNode
+  | string
 
 export type GraphQLQuery = Record<string, any> | null
 export type GraphQLVariables = Record<string, any>
@@ -121,25 +142,10 @@ export class GraphQLHandler extends RequestHandler<
     resolver: ResponseResolver<GraphQLResolverExtras<any>, any, any>,
     options?: RequestHandlerOptions,
   ) {
-    let resolvedOperationName = predicate
-
-    if (isDocumentNode(resolvedOperationName)) {
-      const parsedNode = parseDocumentNode(resolvedOperationName)
-
-      if (parsedNode.operationType !== operationType) {
-        throw new Error(
-          `Failed to create a GraphQL handler: provided a DocumentNode with a mismatched operation type (expected "${operationType}", but got "${parsedNode.operationType}").`,
-        )
-      }
-
-      if (!parsedNode.operationName) {
-        throw new Error(
-          `Failed to create a GraphQL handler: provided a DocumentNode with no operation name.`,
-        )
-      }
-
-      resolvedOperationName = parsedNode.operationName
-    }
+    const resolvedOperationName = GraphQLHandler.resolveOperationName(
+      operationType,
+      predicate,
+    )
 
     const displayOperationName =
       typeof resolvedOperationName === 'function'
@@ -162,6 +168,57 @@ export class GraphQLHandler extends RequestHandler<
     })
 
     this.endpoint = endpoint
+  }
+
+  private static resolveOperationName(
+    operationType: GraphQLOperationType,
+    predicate: GraphQLPredicate,
+  ): GraphQLPredicate {
+    if (isDocumentNode(predicate)) {
+      const parsedNode = parseDocumentNode(predicate)
+
+      if (parsedNode.operationType !== operationType) {
+        throw new Error(
+          `Failed to create a GraphQL handler: provided a DocumentNode with a mismatched operation type (expected "${operationType}", but got "${parsedNode.operationType}").`,
+        )
+      }
+
+      if (!parsedNode.operationName) {
+        throw new Error(
+          `Failed to create a GraphQL handler: provided a DocumentNode with no operation name.`,
+        )
+      }
+
+      return parsedNode.operationName
+    }
+
+    if (predicate instanceof String) {
+      const parsedNode = parse(predicate.toString())
+
+      if (!isDocumentNode(parsedNode)) {
+        throw new Error(
+          `Failed to create a GraphQL handler: provided a TypedDocumentString could not be parsed into a DocumentNode.`,
+        )
+      }
+
+      const parsedQuery = parseDocumentNode(parsedNode)
+
+      if (parsedQuery.operationType !== operationType) {
+        throw new Error(
+          `Failed to create a GraphQL handler: provided a TypedDocumentString with a mismatched operation type (expected "${operationType}", but got "${parsedQuery.operationType}").`,
+        )
+      }
+
+      if (!parsedQuery.operationName) {
+        throw new Error(
+          `Failed to create a GraphQL handler: provided a TypedDocumentString with no operation name.`,
+        )
+      }
+
+      return parsedQuery.operationName
+    }
+
+    return predicate
   }
 
   /**

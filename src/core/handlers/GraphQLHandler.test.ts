@@ -6,9 +6,19 @@ import {
   GraphQLRequestBody,
   GraphQLResolverExtras,
   isDocumentNode,
+  DocumentTypeDecoration,
 } from './GraphQLHandler'
 import { HttpResponse } from '../HttpResponse'
 import { ResponseResolver } from './RequestHandler'
+
+class TypedDocumentString
+  extends String
+  implements DocumentTypeDecoration<any, any>
+{
+  __apiType?: any
+  __resultType?: any
+  __variablesType?: any
+}
 
 const resolver: ResponseResolver<GraphQLResolverExtras<{ userId: string }>> = ({
   variables,
@@ -127,6 +137,47 @@ describe('info', () => {
     expect(handler.info).toHaveProperty('operationName', 'Login')
   })
 
+  it('parses a query operation name from a given TypedDocumentString', () => {
+    const node = new TypedDocumentString(`
+      query GetUser {
+        user {
+          firstName
+        }
+      }
+    `)
+
+    const handler = new GraphQLHandler(
+      OperationTypeNode.QUERY,
+      node,
+      '*',
+      resolver,
+    )
+
+    expect(handler.info).toHaveProperty('header', 'query GetUser (origin: *)')
+    expect(handler.info).toHaveProperty('operationType', 'query')
+    expect(handler.info).toHaveProperty('operationName', 'GetUser')
+  })
+
+  it('parses a mutation operation name from a given TypedDocumentString', () => {
+    const node = new TypedDocumentString(`
+      mutation Login {
+        user {
+          id
+        }
+      }
+    `)
+    const handler = new GraphQLHandler(
+      OperationTypeNode.MUTATION,
+      node,
+      '*',
+      resolver,
+    )
+
+    expect(handler.info).toHaveProperty('header', 'mutation Login (origin: *)')
+    expect(handler.info).toHaveProperty('operationType', 'mutation')
+    expect(handler.info).toHaveProperty('operationName', 'Login')
+  })
+
   it('throws an exception given a DocumentNode with a mismatched operation type', () => {
     const node = parse(`
       mutation CreateUser {
@@ -140,6 +191,22 @@ describe('info', () => {
       () => new GraphQLHandler(OperationTypeNode.QUERY, node, '*', resolver),
     ).toThrow(
       'Failed to create a GraphQL handler: provided a DocumentNode with a mismatched operation type (expected "query", but got "mutation").',
+    )
+  })
+
+  it('throws an exception given a TypedDocumentString with a mismatched operation type', () => {
+    const node = new TypedDocumentString(`
+      mutation CreateUser {
+        user {
+          firstName
+        }
+      }
+    `)
+
+    expect(
+      () => new GraphQLHandler(OperationTypeNode.QUERY, node, '*', resolver),
+    ).toThrow(
+      'Failed to create a GraphQL handler: provided a TypedDocumentString with a mismatched operation type (expected "query", but got "mutation").',
     )
   })
 })
